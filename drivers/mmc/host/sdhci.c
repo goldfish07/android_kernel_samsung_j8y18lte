@@ -1716,6 +1716,8 @@ out:
 	return err;
 }
 
+static int sdhci_card_busy(struct mmc_host *mmc);
+
 static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
 	struct sdhci_host *host;
@@ -1752,6 +1754,16 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		else
 			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
 					SDHCI_CARD_PRESENT;
+	}
+
+	/*
+	 * Check SDcard busy signal by DAT0 before sending CMD13
+	 * about 10ms : 100us * 100 times
+	 */
+	if (present && (mrq->cmd->opcode == MMC_SEND_STATUS)) {
+		int tries = 100;
+		while (sdhci_card_busy(mmc) && --tries)
+			usleep_range(95, 105);
 	}
 
 	spin_lock_irqsave(&host->lock, flags);

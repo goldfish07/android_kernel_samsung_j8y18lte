@@ -45,6 +45,7 @@
 #include <linux/security.h>
 #include <linux/string.h>
 #include <linux/list.h>
+#include <linux/ratelimit.h>
 #include "multiuser.h"
 
 /* the file system name */
@@ -199,6 +200,7 @@ struct sdcardfs_mount_options {
 	bool default_normal;
 	bool unshared_obb;
 	unsigned int reserved_mb;
+	bool nocache;
 };
 
 struct sdcardfs_vfsmount_options {
@@ -580,6 +582,11 @@ static inline int check_min_free_space(struct dentry *dentry, size_t size, int d
 	struct kstatfs statfs;
 	u64 avail;
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
+
+	if (uid_eq(GLOBAL_ROOT_UID, current_fsuid()) ||
+			capable(CAP_SYS_RESOURCE) ||
+			in_group_p(AID_USE_ROOT_RESERVED))
+		return 1;
 
 	if (sbi->options.reserved_mb) {
 		/* Get fs stat of lower filesystem. */

@@ -3694,7 +3694,6 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 		if (!mdwc->host_only_mode)
 			dwc3_post_host_reset_core_init(dwc);
 
-		pm_runtime_mark_last_busy(mdwc->dev);
 		pm_runtime_put_sync_autosuspend(mdwc->dev);
 
 		dbg_event(0xFF, "StopHost psync",

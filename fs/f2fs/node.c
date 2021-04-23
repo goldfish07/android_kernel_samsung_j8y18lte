@@ -1517,7 +1517,6 @@ static int __write_node_page(struct page *page, bool atomic, bool *submitted,
 
 	if (wbc->sync_mode == WB_SYNC_NONE &&
 			IS_DNODE(page) && is_cold_node(page))
-		goto redirty_out;
 
 	/* get old block addr of this node page */
 	nid = nid_of_node(page);

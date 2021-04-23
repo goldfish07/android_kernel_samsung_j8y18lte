@@ -1615,8 +1615,8 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			} else if (data->payload_size >=
 				   (2 * sizeof(uint32_t))) {
 				if ((payload[1] >
-					   ((ADM_GET_TOPO_MODULE_LIST_LENGTH /
-					   sizeof(uint32_t)) - 1))  ||
+				    ((ADM_GET_TOPO_MODULE_LIST_LENGTH /
+					   sizeof(uint32_t)) - 1))	||
 				((data->payload_size -
 				(2 *  sizeof(uint32_t))) <
 				(payload[1] * sizeof(uint32_t))))  {

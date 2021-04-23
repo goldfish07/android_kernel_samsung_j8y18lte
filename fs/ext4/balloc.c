@@ -574,6 +574,11 @@ static int ext4_has_free_clusters(struct ext4_sb_info *sbi,
 	if (free_clusters >= (rsv + nclusters + dirty_clusters))
 		return 1;
 
+	if (flags & EXT4_MB_USE_EXTRA_ROOT_BLOCKS) {
+		if (free_clusters >= (rsv + nclusters + dirty_clusters))
+			return 1;
+	}
+
 	/* Hm, nope.  Are (enough) root reserved clusters available? */
 	if (uid_eq(sbi->s_resuid, current_fsuid()) ||
 	    (!gid_eq(sbi->s_resgid, GLOBAL_ROOT_GID) && in_group_p(sbi->s_resgid)) ||

@@ -2715,7 +2715,7 @@ int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range)
 		return -EINVAL;
 
 	if (end < MAIN_BLKADDR(sbi))
-		goto out;
+		return -EINVAL;
 
 	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK)) {
 		f2fs_msg(sbi->sb, KERN_WARNING,
@@ -2754,7 +2754,6 @@ int f2fs_trim_fs(struct f2fs_sb_info *sbi, struct fstrim_range *range)
 	 */
 	if (test_opt(sbi, DISCARD))
 		goto out;
-
 	start_block = START_BLOCK(sbi, start_segno);
 	end_block = START_BLOCK(sbi, end_segno + 1);
 

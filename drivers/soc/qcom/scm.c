@@ -624,8 +624,19 @@ static int allocate_extra_arg_buffer(struct scm_desc *desc, gfp_t flags)
 	return 0;
 }
 
+#ifdef CONFIG_TIMA_LKMAUTH
+pid_t pid_from_lkm = -1;
+#endif
+
 static int __scm_call2(u32 fn_id, struct scm_desc *desc, bool retry)
 {
+	const char * const proca_clients_names[] = {
+		 "secure_storage_", "pa_daemon", "proca@1.0-servi",
+		 "vaultkeeper@1.0", "vaultkeeperd", "keymaster@3.0-s",
+		 "wsmd", "wsm@1.0-service", NULL
+	}; // keep last NULL!
+	int call_from_proca = 0;
+	int i;
 	int arglen = desc->arginfo & 0xf;
 	int ret, retry_count = 0;
 	u64 x0;
@@ -676,6 +687,9 @@ static int __scm_call2(u32 fn_id, struct scm_desc *desc, bool retry)
 			pr_warn("scm: secure world has been busy for 1 second!\n");
 	} while (ret == SCM_V2_EBUSY && (retry_count++ < SCM_EBUSY_MAX_RETRY));
 out:
+
+	sec_debug_secure_log(fn_id, SCM_EXIT);
+
 	if (ret < 0)
 		pr_err("scm_call failed: func id %#llx, ret: %d, syscall returns: %#llx, %#llx, %#llx\n",
 			x0, ret, desc->ret[0], desc->ret[1], desc->ret[2]);

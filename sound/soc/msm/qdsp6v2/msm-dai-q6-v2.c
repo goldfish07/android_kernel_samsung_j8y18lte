@@ -5490,6 +5490,23 @@ static int msm_dai_q6_tdm_hw_params(struct snd_pcm_substream *substream,
 	tdm->slot_width = tdm_group->slot_width;
 	tdm->slot_mask = tdm_group->slot_mask;
 
+	/* re-check slot mask */
+	if (tdm->nslots_per_frame != tdm->num_channels)
+	{
+		switch (tdm->num_channels) {
+		case 2:
+			tdm->slot_mask = 0x3;
+			break;
+		case 4:
+			tdm->slot_mask = 0xF;
+			break;
+		default :
+			dev_err(dai->dev, "%s: invalid param channels %d\n",
+				__func__, tdm->num_channels);
+			return -EINVAL;
+		}
+	}
+
 	pr_debug("%s: TDM:\n"
 		"num_channels=%d sample_rate=%d bit_width=%d\n"
 		"nslots_per_frame=%d slot_width=%d slot_mask=0x%x\n"
@@ -5763,8 +5780,10 @@ static int msm_dai_q6_tdm_prepare(struct snd_pcm_substream *substream,
 			atomic_inc(group_ref);
 		}
 
-		dai_data->port_cfg.tdm.num_channels = 1;
-		dai_data->port_cfg.tdm.slot_mask = 1;
+		if (dai_data->sec_port_enable) {
+			dai_data->port_cfg.tdm.num_channels = 1;
+			dai_data->port_cfg.tdm.slot_mask = 1;
+		}
 
 		dev_dbg(dai->dev, "\n%s:open sec port id %d TDM rate: %d\n"
 			"dai_data->port_cfg.tdm.slot_mask %x\n"

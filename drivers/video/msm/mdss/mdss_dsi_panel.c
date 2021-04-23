@@ -28,6 +28,16 @@
 #ifdef TARGET_HW_MDSS_HDMI
 #include "mdss_dba_utils.h"
 #endif
+
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+#include "mdss_debug.h"
+#include "samsung/ss_dsi_panel_common.h"
+DEFINE_MUTEX(STATUS_CHANGE);
+/* For Hall ic panel reset funtion */
+DEFINE_MUTEX(LP_STOP_MODE_LOCK);
+//extern unsigned int is_boot_recovery; /* not use */
+#endif
+
 #define DT_CMD_HDR 6
 #define MIN_REFRESH_RATE 48
 #define DEFAULT_MDP_TRANSFER_TIME 14000
@@ -2886,3 +2896,47 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->panel_data.get_idle = mdss_dsi_panel_get_idle_mode;
 	return 0;
 }
+
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG)
+int mdss_samsung_parse_dcs_cmds(struct device_node *np,
+		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
+{
+	return mdss_dsi_parse_dcs_cmds(np, pcmds, cmd_key, link_key);
+}
+
+u32 mdss_samsung_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl,
+		struct dsi_panel_cmds *pcmds, int read_size)
+{
+	struct dcs_cmd_req cmdreq;
+	struct mdss_panel_info *pinfo;
+	struct samsung_display_driver_data *vdd = samsung_get_vdd();
+
+	pinfo = &(ctrl->panel_data.panel_info);
+	if (pinfo->dcs_cmd_by_left) {
+		if (ctrl->ndx != DSI_CTRL_LEFT)
+			return -EINVAL;
+	}
+
+	memset(&cmdreq, 0, sizeof(cmdreq));
+	cmdreq.cmds = pcmds->cmds;
+	cmdreq.cmds_cnt = 1;
+	cmdreq.flags = CMD_REQ_RX | CMD_REQ_COMMIT;
+
+	if (vdd->poc_operation)
+		cmdreq.flags |=CMD_REQ_DMA_TPG;
+
+	if (read_size)
+		cmdreq.rlen = read_size;
+	else
+		cmdreq.rlen = pcmds->read_size[0];
+
+	cmdreq.rbuf = ctrl->rx_buf.data;
+	cmdreq.cb = NULL; /* call back */
+	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+	/*
+	 * blocked here, until call back called
+	 */
+
+	return ctrl->rx_buf.len;
+}
+#endif

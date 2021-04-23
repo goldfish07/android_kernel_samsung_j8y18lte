@@ -288,8 +288,19 @@ static int verity_verify_level(struct dm_verity *v, struct dm_verity_io *io,
 			aux->hash_verified = 1;
 		else if (verity_fec_decode(v, io,
 					   DM_VERITY_BLOCK_TYPE_METADATA,
-					   hash_block, data, NULL) == 0)
+					   hash_block, data, NULL) == 0){
+#ifdef SEC_HEX_DEBUG
+		        add_fec_correct_blks();
+			add_fc_blks_entry(hash_block,v->data_dev->name);
+#endif
 			aux->hash_verified = 1;
+		}
+#ifdef SEC_HEX_DEBUG
+		else if (verity_handle_err_hex_debug(v,
+					   DM_VERITY_BLOCK_TYPE_METADATA,
+					   hash_block, io, NULL)) {
+		        add_corrupted_blks();
+#else
 		else if (verity_handle_err(v,
 					   DM_VERITY_BLOCK_TYPE_METADATA,
 					   hash_block)) {
@@ -426,6 +437,9 @@ static int verity_verify_io(struct dm_verity_io *io)
 		if (v->validated_blocks &&
 		    likely(test_bit(cur_block, v->validated_blocks))) {
 			verity_bv_skip_block(v, io, &io->iter);
+#ifdef SEC_HEX_DEBUG
+			add_skipped_blks();
+#endif
 			continue;
 		}
 
@@ -468,11 +482,23 @@ static int verity_verify_io(struct dm_verity_io *io)
 			continue;
 		}
 		else if (verity_fec_decode(v, io, DM_VERITY_BLOCK_TYPE_DATA,
-					   cur_block, NULL, &start) == 0)
+					   cur_block, NULL, &start) == 0){
+#ifdef SEC_HEX_DEBUG
+		        add_fec_correct_blks();
+			add_fc_blks_entry(cur_block,v->data_dev->name);
+#endif
 			continue;
+		}
+#ifdef SEC_HEX_DEBUG
+		else if (verity_handle_err_hex_debug(v, DM_VERITY_BLOCK_TYPE_DATA,
+					   cur_block, io, &start)){
+		        add_corrupted_blks();
+#else
 		else if (verity_handle_err(v, DM_VERITY_BLOCK_TYPE_DATA,
-					   cur_block))
+					   cur_block)){
+#endif
 			return -EIO;
+		}
 	}
 
 	return 0;
@@ -563,7 +589,21 @@ no_prefetch_cluster:
 
 static void verity_submit_prefetch(struct dm_verity *v, struct dm_verity_io *io)
 {
+	sector_t block = io->block;
+	unsigned int n_blocks = io->n_blocks;
 	struct dm_verity_prefetch_work *pw;
+
+	if (v->validated_blocks) {
+		while (n_blocks && test_bit(block, v->validated_blocks)) {
+			block++;
+			n_blocks--;
+		}
+		while (n_blocks && test_bit(block + n_blocks - 1,
+					v->validated_blocks))
+			n_blocks--;
+		if (!n_blocks)
+			return;
+	}
 
 	pw = kmalloc(sizeof(struct dm_verity_prefetch_work),
 		GFP_NOIO | __GFP_NORETRY | __GFP_NOMEMALLOC | __GFP_NOWARN);
@@ -573,8 +613,8 @@ static void verity_submit_prefetch(struct dm_verity *v, struct dm_verity_io *io)
 
 	INIT_WORK(&pw->work, verity_prefetch_io);
 	pw->v = v;
-	pw->block = io->block;
-	pw->n_blocks = io->n_blocks;
+	pw->block = block;
+	pw->n_blocks = n_blocks;
 	queue_work(v->verify_wq, &pw->work);
 }
 
@@ -611,6 +651,15 @@ int verity_map(struct dm_target *ti, struct bio *bio)
 	io->orig_bi_private = bio->bi_private;
 	io->block = bio->bi_iter.bi_sector >> (v->data_dev_block_bits - SECTOR_SHIFT);
 	io->n_blocks = bio->bi_iter.bi_size >> v->data_dev_block_bits;
+
+#ifdef SEC_HEX_DEBUG
+	add_total_blks(io->n_blocks);
+
+	if (get_total_blks() - get_prev_total_blks() > 0x4000){
+	    set_prev_total_blks(get_total_blks());
+	    print_blks_cnt(v->data_dev->name);
+	}
+#endif
 
 	bio->bi_end_io = verity_end_io;
 	bio->bi_private = io;
@@ -1067,6 +1116,18 @@ int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 			goto bad;
 	}
 
+#ifdef SEC_HEX_DEBUG
+	get_b_info(v->data_dev->name);
+#endif
+
+#ifdef CONFIG_DM_ANDROID_VERITY_AT_MOST_ONCE_DEFAULT_ENABLED
+        if (!v->validated_blocks) {
+                r = verity_alloc_most_once(v);
+                if (r)
+                        goto bad; 
+        }
+#endif
+
 	v->hash_per_block_bits =
 		__fls((1 << v->hash_dev_block_bits) / v->digest_size);
 
@@ -1134,9 +1195,28 @@ int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	ti->per_bio_data_size = roundup(ti->per_bio_data_size,
 					__alignof__(struct dm_verity_io));
 
+#ifdef DMV_ALTA
+    v->verity_bitmap = kmalloc(round_up(v->data_blocks, 8) >> 3, GFP_KERNEL);
+    if (v->verity_bitmap == NULL) {
+        ti->error = "Cannot allocate verity_bitmap";
+        r = -ENOMEM;
+        goto bad;
+    }
+    memset(v->verity_bitmap, 0, round_up(v->data_blocks, 8) >> 3);
+#endif
+
+#ifdef SEC_HEX_DEBUG
+        if (!verity_fec_is_enabled(v))
+	    add_fec_off_cnt(v->data_dev->name);
+#endif
+
 	return 0;
 
 bad:
+
+#ifdef SEC_HEX_DEBUG
+	add_fec_off_cnt("bad");
+#endif
 	verity_dtr(ti);
 
 	return r;

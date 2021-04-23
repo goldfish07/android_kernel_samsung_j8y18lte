@@ -80,7 +80,7 @@ spinlock_t msm_pid_lock;
 #define msm_delete_sd_entry(queue, type, member, q_node) ({		\
 	unsigned long flags;					\
 	struct msm_queue_head *__q = (queue);			\
-	type *node = 0;				\
+	type *node = NULL;				\
 	spin_lock_irqsave(&__q->lock, flags);			\
 	if (!list_empty(&__q->list)) {				\
 		list_for_each_entry(node, &__q->list, member)	\
@@ -1019,7 +1019,7 @@ static int msm_close(struct file *filep)
 	/*stop all hardware blocks immediately*/
 	mutex_lock(&ordered_sd_mtx);
 	if (!list_empty(&msm_v4l2_dev->subdevs))
-		list_for_each_entry(msm_sd, &ordered_sd_list, list)
+		list_for_each_entry_reverse(msm_sd, &ordered_sd_list, list)
 			__msm_sd_close_subdevs(msm_sd, &sd_close);
 	mutex_unlock(&ordered_sd_mtx);
 

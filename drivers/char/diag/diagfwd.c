@@ -938,8 +938,10 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 			entry.cmd_code_hi);
 	}
 
-	if ((len >= sizeof(uint8_t)) && *buf == DIAG_CMD_LOG_ON_DMND &&
-		driver->log_on_demand_support &&
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS,"diag: In %s, received cmd %02x %02x %02x\n",
+		 __func__, entry.cmd_code, entry.subsys_id, entry.cmd_code_hi);
+
+	if ((len >= sizeof(uint8_t)) && *buf == DIAG_CMD_LOG_ON_DMND && driver->log_on_demand_support &&
 	    driver->feature[PERIPHERAL_MODEM].rcvd_feature_mask) {
 		write_len = diag_cmd_log_on_demand(buf, len,
 						   driver->apps_rsp_buf,

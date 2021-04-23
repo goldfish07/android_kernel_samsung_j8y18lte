@@ -1752,7 +1752,7 @@ decrypt_passphrase_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	mutex_lock(tfm_mutex);
 	rc = crypto_blkcipher_setkey(
 		desc.tfm, auth_tok->token.password.session_key_encryption_key,
-		auth_tok->token.password.session_key_encryption_key_bytes);
+		crypt_stat->key_size);
 	if (unlikely(rc < 0)) {
 		mutex_unlock(tfm_mutex);
 		printk(KERN_ERR "Error setting key for crypto context\n");
@@ -1761,6 +1761,55 @@ decrypt_passphrase_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	}
 	rc = crypto_blkcipher_decrypt(&desc, dst_sg, src_sg,
 				      auth_tok->session_key.encrypted_key_size);
+#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
+#ifdef CONFIG_SDP
+	if(!(crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
+#endif
+	if(crypt_stat->flags & ECRYPTFS_ENABLE_HMAC) {
+		if (crypt_stat->flags & ECRYPTFS_SUPPORT_HMAC_KEY
+				&& auth_tok->token.password.session_key_encryption_key_bytes == ECRYPTFS_MAX_KEY_BYTES) {
+			rz = eCryptfs_hmac_sha256(auth_tok->token.password.session_key_encryption_key + SEC_ECRYPTFS_HMAC_KEY_SIZE,
+				crypt_stat->key_size, auth_tok->session_key.decrypted_key, auth_tok->session_key.encrypted_key_size, hmac_hash);
+		} else {
+			rz = eCryptfs_hmac_sha256(auth_tok->token.password.session_key_encryption_key,
+				crypt_stat->key_size, auth_tok->session_key.decrypted_key, auth_tok->session_key.encrypted_key_size, hmac_hash);
+		}
+
+		if (unlikely(rz)) {
+			mutex_unlock(tfm_mutex);
+			ecryptfs_printk(KERN_ERR, "Error Generating Hash : rz = [%d]\n", rz);
+			return rz;
+		}
+		if(memcmp(crypt_stat->hash, hmac_hash, FEK_HASH_SIZE)) {
+			ecryptfs_printk(KERN_ERR, "FEK Integrity Verification Failed...\n");
+			mutex_unlock(tfm_mutex);
+			return -1;
+		}
+	}
+	else {
+		ecryptfs_printk(KERN_INFO, "HMAC HASH is Not Present in SD Card...\n");
+	}
+#ifdef CONFIG_SDP
+	}
+#endif
+#endif
+#ifdef CONFIG_CRYPTO_FIPS
+	if (crypt_stat->mount_crypt_stat->flags & ECRYPTFS_ENABLE_CC)
+		crypto_blkcipher_set_iv(desc.tfm, iv, ECRYPTFS_DEFAULT_IV_BYTES);
+	if (unlikely(rc)) {
+		mutex_unlock(tfm_mutex);
+		printk(KERN_ERR "Error decrypting; rc = [%d]\n", rc);
+		goto out;
+	}
+	/* Session key(the key to decrypt file encryption keys) CLEAR! */
+	memset(auth_tok->token.password.session_key_encryption_key, 0, ECRYPTFS_MAX_KEY_BYTES);
+	rc = crypto_blkcipher_setkey(desc.tfm, auth_tok->token.password.session_key_encryption_key, crypt_stat->key_size);
+	mutex_unlock(tfm_mutex);
+	if (unlikely(rc < 0)) {
+		printk(KERN_ERR "Error(decrypt) Session Key CLEAR in desc.tfm; rc = [%d]\n", rc);
+	}
+	rc = 0;
+#else
 	mutex_unlock(tfm_mutex);
 	if (unlikely(rc)) {
 		printk(KERN_ERR "Error decrypting; rc = [%d]\n", rc);
@@ -2234,6 +2283,7 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 	size_t i;
 	size_t encrypted_session_key_valid = 0;
 	char session_key_encryption_key[ECRYPTFS_MAX_KEY_BYTES];
+	char session_hmac_key[SEC_ECRYPTFS_HMAC_KEY_SIZE];
 	struct scatterlist dst_sg[2];
 	struct scatterlist src_sg[2];
 	struct mutex *tfm_mutex = NULL;
@@ -2305,8 +2355,16 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 				auth_tok->token.password.
 				session_key_encryption_key_bytes);
 		memcpy(session_key_encryption_key,
-		auth_tok->token.password.session_key_encryption_key,
-		auth_tok->token.password.session_key_encryption_key_bytes);
+		       auth_tok->token.password.session_key_encryption_key,
+		       crypt_stat->key_size);
+			   			   
+		if (crypt_stat->flags & ECRYPTFS_SUPPORT_HMAC_KEY 
+				&& auth_tok->token.password.session_key_encryption_key_bytes == ECRYPTFS_MAX_KEY_BYTES){
+			memcpy(session_hmac_key,
+				auth_tok->token.password.session_key_encryption_key + SEC_ECRYPTFS_HMAC_KEY_SIZE,
+				crypt_stat->key_size);
+		}
+			   
 		ecryptfs_printk(KERN_DEBUG,
 				"Cached session key encryption key:\n");
 		if (ecryptfs_verbosity > 0)
@@ -2316,6 +2374,24 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 		ecryptfs_printk(KERN_DEBUG, "Session key encryption key:\n");
 		ecryptfs_dump_hex(session_key_encryption_key, 16);
 	}
+#ifdef CONFIG_ECRYPTFS_FEK_INTEGRITY
+	if(crypt_stat->flags & ECRYPTFS_ENABLE_HMAC) {
+		if(crypt_stat->flags & ECRYPTFS_SUPPORT_HMAC_KEY 
+				&& auth_tok->token.password.session_key_encryption_key_bytes == ECRYPTFS_MAX_KEY_BYTES ) {
+			rc = eCryptfs_hmac_sha256(session_hmac_key, crypt_stat->key_size,
+				crypt_stat->key, crypt_stat->key_size, crypt_stat->hash);
+		}else {
+			rc = eCryptfs_hmac_sha256(session_key_encryption_key, crypt_stat->key_size,
+				crypt_stat->key, crypt_stat->key_size, crypt_stat->hash);
+		}
+		
+		if (rc < 0) {
+			mutex_unlock(tfm_mutex);
+			ecryptfs_printk(KERN_ERR, "Error Generating Hash for FEK : rc = [%d]\n", rc);
+			goto out;
+		}
+	}
+#endif
 	rc = virt_to_scatterlist(crypt_stat->key, key_rec->enc_key_size,
 				 src_sg, 2);
 	if (rc < 1 || rc > 2) {
@@ -2339,7 +2415,7 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 	}
 	mutex_lock(tfm_mutex);
 	rc = crypto_blkcipher_setkey(desc.tfm, session_key_encryption_key,
-		auth_tok->token.password.session_key_encryption_key_bytes);
+		crypt_stat->key_size);
 	if (rc < 0) {
 		mutex_unlock(tfm_mutex);
 		ecryptfs_printk(KERN_ERR, "Error setting key for crypto "

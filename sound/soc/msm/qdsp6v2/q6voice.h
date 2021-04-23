@@ -846,6 +846,37 @@ struct cvp_set_tx_dtmf_mute_detection_cmd {
 
 
 /*
+ *Event sent by the stream to the client that enables Tx Mute DTMF
+ *detection whenever DTMF is detected in the Tx path
+ */
+
+#define VSS_IVOCPROC_CMD_SET_TX_DTMF_MUTE 0x00013362
+
+/* DTMF mute enable flag. */
+#define VSS_IVOCPROC_TX_DTMF_MUTE_ENABLE 1
+
+/* DTMF mute disable flag. */
+#define VSS_IVOCPROC_TX_DTMF_MUTE_DISABLE 0
+
+struct vss_ivocproc_cmd_set_tx_dtmf_mute_t {
+
+	uint16_t enable;
+	/*Specifies whether Tx DTMF mute is enabled.
+
+	@values
+	- #VSS_IVOCPROC_TX_DTMF_MUTE_ENABLE
+	- #VSS_IVOCPROC_TX_DTMF_MUTE_DISABLE @tablebulletend */
+	uint16_t delay_us;
+	/*This is delay between input and output of DTMF module.*/
+};
+
+struct cvp_set_tx_dtmf_mute_detection_cmd {
+	struct apr_hdr hdr;
+	struct vss_ivocproc_cmd_set_tx_dtmf_mute_t cvp_dtmf_det;
+} __packed;
+
+
+/*
  * Event sent by the stream to the client that enables Rx DTMF
  * detection whenever DTMF is detected in the Rx path.
  *

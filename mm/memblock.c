@@ -1633,6 +1633,165 @@ static const struct file_operations memblock_debug_fops = {
 	.release = single_release,
 };
 
+static int memsize_kernel_show(struct seq_file *m, void *private)
+{
+	int i;
+	unsigned long total, initmem, kernel, text, rodata, data, bss, etc;
+	struct reserved_mem_reg *rmem_reg;
+	unsigned long unsigned_size;
+
+	initmem = __init_end - __init_begin;
+	rmem_reg = &kernel_mem_reg[MEMSIZE_KERNEL_KERNEL];
+	kernel = rmem_reg->size - initmem;
+	text = _etext - _text;
+	rodata = __end_rodata - __start_rodata;
+	if (__start_rodata < _etext)
+		text -= rodata;
+	data = _edata - _sdata;
+	bss = __bss_stop - __bss_start;
+	etc = kernel - text - rodata - data - bss;
+
+	seq_printf(m, " Kernel     : %8lu KB\n"
+		      "  .text     : %8lu KB\n"
+		      "  .rodata   : %8lu KB\n"
+		      "  .data     : %8lu KB\n"
+		      "  .BSS      : %8lu KB\n"
+		      "  .ETC      : %8lu KB\n",
+		   DIV_ROUND_UP(kernel, SZ_1K),
+		   DIV_ROUND_UP(text, SZ_1K),
+		   DIV_ROUND_UP(rodata, SZ_1K),
+		   DIV_ROUND_UP(data, SZ_1K),
+		   DIV_ROUND_UP(bss, SZ_1K),
+		   DIV_ROUND_UP(etc, SZ_1K));
+
+	total = kernel;
+	for (i = MEMSIZE_KERNEL_KERNEL + 1; i < MEMSIZE_KERNEL_STOP; i++) {
+		rmem_reg = &kernel_mem_reg[i];
+		unsigned_size = (unsigned long)rmem_reg->size;
+
+		seq_printf(m, " %s : %8lu KB\n", rmem_reg->name,
+			   DIV_ROUND_UP(unsigned_size, SZ_1K));
+		total += unsigned_size;
+	}
+	seq_printf(m, " Total      : %8lu KB\n", DIV_ROUND_UP(total, SZ_1K));
+
+	return 0;
+}
+
+static unsigned long get_memsize_kernel(void)
+{
+	int i;
+	unsigned long total;
+	struct reserved_mem_reg *rmem_reg;
+
+	rmem_reg = &kernel_mem_reg[MEMSIZE_KERNEL_KERNEL];
+	total = rmem_reg->size - (__init_end - __init_begin);
+
+	for (i = MEMSIZE_KERNEL_KERNEL + 1; i < MEMSIZE_KERNEL_STOP; i++) {
+		rmem_reg = &kernel_mem_reg[i];
+		total += (unsigned long)rmem_reg->size;
+	}
+
+	return total;
+}
+
+static int proc_memsize_kernel_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, memsize_kernel_show, NULL);
+}
+
+static const struct file_operations proc_memsize_kernel_fops = {
+	.open = proc_memsize_kernel_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int __rmem_reg_cmp(const void *a, const void *b)
+{
+	const struct reserved_mem_reg *ra = a, *rb = b;
+
+	if (ra->base > rb->base)
+		return -1;
+
+	if (ra->base < rb->base)
+		return 1;
+
+	return 0;
+}
+
+static int memsize_reserved_show(struct seq_file *m, void *private)
+{
+	int i;
+	struct reserved_mem_reg *rmem_reg;
+	unsigned long dt_reserved = 0, reusable = 0, kernel, total;
+	unsigned long system = totalram_pages << PAGE_SHIFT;
+
+	sort(reserved_mem_reg, reserved_mem_reg_count,
+	     sizeof(reserved_mem_reg[0]), __rmem_reg_cmp, NULL);
+	seq_printf(m, "v1\n");
+	for (i = 0 ; i < reserved_mem_reg_count; i++)
+	{
+		rmem_reg = &reserved_mem_reg[i];
+		seq_printf(m, "0x%09lx-0x%09lx 0x%08lx ( %7lu KB ) %s %s %s\n",
+#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+			   0UL,
+			   0UL,
+#else
+			   (unsigned long)rmem_reg->base,
+			   (unsigned long)(rmem_reg->base + rmem_reg->size),
+#endif
+			   (unsigned long)rmem_reg->size,
+			   (unsigned long)DIV_ROUND_UP(rmem_reg->size, SZ_1K),
+#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+			   "xxxxx",
+#else
+			   rmem_reg->nomap ? "nomap" : "  map",
+#endif
+			   rmem_reg->reusable ? "reusable" : "unusable",
+			   rmem_reg->name);
+		if (rmem_reg->reusable)
+			reusable += (unsigned long)rmem_reg->size;
+		else
+			dt_reserved += (unsigned long)rmem_reg->size;
+	}
+
+	kernel = get_memsize_kernel();
+	seq_printf(m, "0x%09lx-0x%09lx 0x%08lx ( %7lu KB ) %s %s %s\n",
+		   0UL, 0UL, kernel, DIV_ROUND_UP(kernel, SZ_1K), "xxxxx",
+		   "unusable", "kernel");
+	total = kernel + dt_reserved + system;
+
+	seq_printf(m, "\n");
+	seq_printf(m, "Reserved    : %7lu KB\n",
+		   DIV_ROUND_UP(kernel + dt_reserved, SZ_1K));
+	seq_printf(m, " .kernel    : %7lu KB\n",
+		   DIV_ROUND_UP(kernel, SZ_1K));
+	seq_printf(m, " .DT&EPARAM : %7lu KB\n",
+		   DIV_ROUND_UP(dt_reserved, SZ_1K));
+	seq_printf(m, "System      : %7lu KB\n",
+		   DIV_ROUND_UP(system, SZ_1K));
+	seq_printf(m, " .common    : %7lu KB\n",
+		   DIV_ROUND_UP(system - reusable, SZ_1K));
+	seq_printf(m, " .reusable  : %7lu KB\n",
+		   DIV_ROUND_UP(reusable, SZ_1K));
+	seq_printf(m, "Total       : %7lu KB ( %5lu.%02lu MB )\n",
+		   DIV_ROUND_UP(total, SZ_1K),
+		   total >> 20, ((total % SZ_1M) * 100) >> 20);
+	return 0;
+}
+
+static int proc_memsize_reserved_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, memsize_reserved_show, NULL);
+}
+
+static const struct file_operations proc_memsize_reserved_fops = {
+	.open = proc_memsize_reserved_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
 static int __init memblock_init_debugfs(void)
 {
 	struct dentry *root = debugfs_create_dir("memblock", NULL);

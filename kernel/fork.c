@@ -1461,6 +1461,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			goto bad_fork_cleanup_io;
 	}
 
+	retval = dup_task_integrity(clone_flags, p);
+	if (retval)
+		goto bad_fork_cleanup_io;
+
 #ifdef CONFIG_BLOCK
 	p->plug = NULL;
 #endif

@@ -33,6 +33,8 @@
 
 struct list_lru binder_alloc_lru;
 
+extern int system_server_pid;
+
 static DEFINE_MUTEX(binder_alloc_mmap_lock);
 
 enum {
@@ -373,6 +375,20 @@ struct binder_buffer *binder_alloc_new_buf_locked(struct binder_alloc *alloc,
 		return ERR_PTR(-ENOSPC);
 	}
 
+	if (is_async &&
+	    524288 <= size + sizeof(struct binder_buffer)) { //512K
+		pr_info("%d: binder_alloc_buf size %zd(%zd) failed, too large async size\n",
+			     alloc->pid, size, alloc->free_async_space);
+
+		return ERR_PTR(-ENOSPC);
+	}
+	if (1048576 <= size + sizeof(struct binder_buffer)) { //1M
+		pr_info("%d: binder_alloc_buf size %zd failed, too large size\n",
+			     alloc->pid, size);
+
+		return ERR_PTR(-ENOSPC);
+	}
+
 	/* Pad 0-size buffers so they get assigned unique addresses */
 	size = max(size, sizeof(void *));
 
@@ -473,6 +489,14 @@ struct binder_buffer *binder_alloc_new_buf_locked(struct binder_alloc *alloc,
 	buffer->extra_buffers_size = extra_buffers_size;
 	if (is_async) {
 		alloc->free_async_space -= size + sizeof(struct binder_buffer);
+		if ((system_server_pid == alloc->pid) && (alloc->free_async_space <= 153600)) { // 150K
+			pr_info("%d: [free_size<150K] binder_alloc_buf size %zd async free %zd\n",
+			alloc->pid, size, alloc->free_async_space);
+		}
+		if ((system_server_pid == alloc->pid) && (size >= 122880)) { // 120K
+			pr_info("%d: [alloc_size>120K] binder_alloc_buf size %zd async free %zd\n",
+				alloc->pid, size, alloc->free_async_space);
+		}
 		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC_ASYNC,
 			     "%d: binder_alloc_buf size %zd async free %zd\n",
 			      alloc->pid, size, alloc->free_async_space);

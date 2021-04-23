@@ -50,6 +50,14 @@
 #define ECRYPTFS_MAX_NUM_USERS 32768
 #define ECRYPTFS_XATTR_NAME "user.ecryptfs"
 
+#define ECRYPTFS_BASE_PATH_SIZE 1024
+#define ECRYPTFS_LABEL_SIZE 1024
+#define SEC_ECRYPTFS_HMAC_KEY_SIZE   32
+
+#ifdef CONFIG_SDP
+#define PKG_NAME_SIZE 16
+#endif
+
 void ecryptfs_dump_auth_tok(struct ecryptfs_auth_tok *auth_tok);
 extern void ecryptfs_to_hex(char *dst, char *src, size_t src_size);
 extern void ecryptfs_from_hex(char *dst, char *src, int dst_size);
@@ -234,6 +242,20 @@ struct ecryptfs_crypt_stat {
 #define ECRYPTFS_ENCFN_USE_FEK        0x00001000
 #define ECRYPTFS_UNLINK_SIGS          0x00002000
 #define ECRYPTFS_I_SIZE_INITIALIZED   0x00004000
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+#define ECRYPTFS_ENCRYPTED_OTHER_DEVICE 0x00008000
+#endif
+#define ECRYPTFS_SUPPORT_HMAC_KEY     0x00010000
+#ifdef CONFIG_SDP
+#define ECRYPTFS_DEK_SDP_ENABLED      0x00100000
+#define ECRYPTFS_DEK_IS_SENSITIVE     0x00200000
+#define ECRYPTFS_DEK_MULTI_ENGINE     0x00400000 // eCryptfs header contains engine id.
+#define ECRYPTFS_SDP_IS_CHAMBER_DIR   0x02000000
+#endif
+#ifdef CONFIG_DLP
+#define ECRYPTFS_DLP_ENABLED		  0x04000000
+#endif
+
 	u32 flags;
 	unsigned int file_version;
 	size_t iv_bytes;

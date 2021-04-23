@@ -843,6 +843,17 @@ static const struct msm_pcie_irq_info_t msm_pcie_msi_info[MSM_PCIE_MAX_MSI] = {
 	{"msi_24", 0}, {"msi_25", 0}, {"msi_26", 0}, {"msi_27", 0},
 	{"msi_28", 0}, {"msi_29", 0}, {"msi_30", 0}, {"msi_31", 0}
 };
+static void msm_pcie_config_l0s_disable_all(struct msm_pcie_dev_t *dev,
+				struct pci_bus *bus);
+static void msm_pcie_config_l1_disable_all(struct msm_pcie_dev_t *dev,
+				struct pci_bus *bus);
+static void msm_pcie_config_l1ss_disable_all(struct msm_pcie_dev_t *dev,
+				struct pci_bus *bus);
+static void msm_pcie_config_l0s_enable_all(struct msm_pcie_dev_t *dev);
+static void msm_pcie_config_l1_enable_all(struct msm_pcie_dev_t *dev);
+static void msm_pcie_config_l1ss_enable_all(struct msm_pcie_dev_t *dev);
+static void msm_pcie_check_l1ss_support_all(struct msm_pcie_dev_t *dev);
+static void msm_pcie_config_link_pm(struct msm_pcie_dev_t *dev, bool enable);
 
 static void msm_pcie_config_l0s_disable_all(struct msm_pcie_dev_t *dev,
 				struct pci_bus *bus);

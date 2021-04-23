@@ -27,6 +27,8 @@
 #include <crypto/hash.h>
 #include <linux/writeback.h>
 #include <linux/overflow.h>
+#include <linux/ctype.h>
+#include "../mount.h"
 
 #define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_F2FS_FS_ENCRYPTION)
 #include <linux/fscrypt.h>
@@ -1767,6 +1769,13 @@ static inline bool __allow_reserved_blocks(struct f2fs_sb_info *sbi,
 	return false;
 }
 
+static inline bool f2fs_android_claim_sec_r_blocks(unsigned long flags) {
+	if (flags & F2FS_CORE_FILE_FL)
+		return true;
+
+	return false;
+}
+
 static inline void f2fs_i_blocks_write(struct inode *, block_t, bool, bool);
 static inline int inc_valid_block_count(struct f2fs_sb_info *sbi,
 				 struct inode *inode, blkcnt_t *count)
@@ -1798,6 +1807,9 @@ static inline int inc_valid_block_count(struct f2fs_sb_info *sbi,
 
 	if (!__allow_reserved_blocks(sbi, inode, true))
 		avail_user_block_count -= F2FS_OPTION(sbi).root_reserved_blocks;
+		if (!f2fs_android_claim_sec_r_blocks(F2FS_I(inode)->i_flags))
+			avail_user_block_count -= F2FS_OPTION(sbi).core_reserved_blocks;
+	}
 
 	if (unlikely(sbi->total_valid_block_count > avail_user_block_count)) {
 		diff = sbi->total_valid_block_count - avail_user_block_count;
@@ -2005,6 +2017,9 @@ static inline int inc_valid_node_count(struct f2fs_sb_info *sbi,
 
 	if (!__allow_reserved_blocks(sbi, inode, false))
 		valid_block_count += F2FS_OPTION(sbi).root_reserved_blocks;
+		if (!f2fs_android_claim_sec_r_blocks(F2FS_I(inode)->i_flags))
+			valid_block_count += F2FS_OPTION(sbi).core_reserved_blocks;
+	}
 
 	if (unlikely(valid_block_count > sbi->user_block_count)) {
 		spin_unlock(&sbi->stat_lock);

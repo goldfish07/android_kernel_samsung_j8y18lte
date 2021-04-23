@@ -308,7 +308,6 @@ static void fastrpc_buf_free(struct fastrpc_buf *buf, int cache)
 		spin_unlock(&fl->hlock);
 		return;
 	}
-
 	if (buf->remote) {
 		spin_lock(&fl->hlock);
 		hlist_del_init(&buf->hn_rem);
@@ -316,7 +315,6 @@ static void fastrpc_buf_free(struct fastrpc_buf *buf, int cache)
 		buf->remote = 0;
 		buf->raddr = 0;
 	}
-
 	if (!IS_ERR_OR_NULL(buf->virt)) {
 		int destVM[1] = {VMID_HLOS};
 		int destVMperm[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
@@ -1156,6 +1154,8 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 
 	/* allocate new buffer */
 	if (copylen) {
+		DEFINE_DMA_ATTRS(ctx_attrs);
+
 		err = fastrpc_buf_alloc(ctx->fl, copylen, ctx_attrs,
 					0, 0, &ctx->buf);
 		if (err)
@@ -1170,6 +1170,7 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 	args = (uintptr_t)ctx->buf->virt + metalen;
 	for (i = 0; i < bufs; ++i) {
 		size_t len = lpra[i].buf.len;
+
 		list[i].num = 0;
 		list[i].pgidx = 0;
 		if (!len)
@@ -1184,8 +1185,8 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 		uint64_t buf = ptr_to_uint64(lpra[i].buf.pv);
 		size_t len = lpra[i].buf.len;
 
-		rpra[i].buf.pv = lrpra[i].buf.pv = 0;
-		rpra[i].buf.len = lrpra[i].buf.len = len;
+		rpra[i].buf.pv = 0;
+		rpra[i].buf.len = len;
 		if (!len)
 			continue;
 		if (map) {
@@ -2059,10 +2060,8 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 	hlist_del_init(&fl->hn);
 	spin_unlock(&fl->apps->hlock);
 
-	if (!fl->sctx) {
-		kfree(fl);
-		return 0;
-	}
+	if (!fl->sctx)
+		goto bail;
 
 	(void)fastrpc_release_current_dsp_process(fl);
 	if (!IS_ERR_OR_NULL(fl->init_mem))
@@ -2076,6 +2075,7 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 		kref_put_mutex(&fl->apps->channel[cid].kref,
 				fastrpc_channel_close, &fl->apps->smd_mutex);
 	mutex_destroy(&fl->map_mutex);
+bail:
 	fastrpc_remote_buf_list_free(fl);
 	kfree(fl);
 	return 0;
@@ -2550,7 +2550,7 @@ static long fastrpc_device_ioctl(struct file *file, unsigned int ioctl_num,
 		}
 		break;
 	case FASTRPC_IOCTL_GETINFO:
-	    K_COPY_FROM_USER(err, 0, &info, param, sizeof(info));
+		K_COPY_FROM_USER(err, 0, &info, param, sizeof(info));
 		if (err)
 			goto bail;
 		VERIFY(err, 0 == (err = fastrpc_get_info(fl, &info)));

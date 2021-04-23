@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, 2019 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -337,7 +337,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 		if (afe_token_is_valid(data->token))
 			wake_up(&this_afe.wait[data->token]);
 		else
-			return -EINVAL;
+			return -EINVAL;	
 	} else if (data->payload_size) {
 		uint32_t *payload;
 		uint16_t port_id = 0;
@@ -375,7 +375,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 				if (afe_token_is_valid(data->token))
 					wake_up(&this_afe.wait[data->token]);
 				else
-					return -EINVAL;
+					return -EINVAL;	
 				break;
 			case AFE_SERVICE_CMD_REGISTER_RT_PORT_DRIVER:
 				break;
@@ -390,7 +390,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 				if (afe_token_is_valid(data->token))
 					wake_up(&this_afe.wait[data->token]);
 				else
-					return -EINVAL;
+					return -EINVAL;	
 				pr_debug("%s: AFE_CMD_ADD_TOPOLOGIES cmd 0x%x\n",
 						__func__, payload[1]);
 				break;
@@ -415,7 +415,7 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			if (afe_token_is_valid(data->token))
 				wake_up(&this_afe.wait[data->token]);
 			else
-				return -EINVAL;
+				return -EINVAL;	
 		} else if (data->opcode == AFE_EVENT_RT_PROXY_PORT_STATUS) {
 			port_id = (uint16_t)(0x0000FFFF & payload[0]);
 		}

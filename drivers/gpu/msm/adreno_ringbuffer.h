@@ -139,6 +139,7 @@ struct adreno_ringbuffer {
 	 * enough.
 	 */
 	u32 profile_index;
+	struct timer_list timer;
 };
 
 /* Returns the current ringbuffer */

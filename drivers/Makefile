@@ -170,5 +170,30 @@ obj-$(CONFIG_ESOC)		+= esoc/
 
 obj-$(CONFIG_BIF)		+= bif/
 
-obj-$(CONFIG_SENSORS)		+= sensors/
-obj-$(CONFIG_SENSORS_SSC)	+= sensors/
+obj-$(CONFIG_SENSORS_CORE)	+= sensors/
+
+# <t-base drivers
+obj-$(CONFIG_TRUSTONIC_TEE)	+= gud/
+
+# FINGERPRINT
+obj-$(CONFIG_SENSORS_FINGERPRINT)	+= fingerprint/
+
+# CONFIG_SEC_DEBUG
+obj-y				+= debug/
+
+# MUIC
+obj-$(CONFIG_USE_MUIC)		+= muic/
+
+# Motor
+obj-y				+= motor/
+
+ifeq ($(CONFIG_FB_MSM_MDSS_SAMSUNG),y)
+	LINUXINCLUDE	+=  -I$(srctree)/drivers/video/msm/mdss/samsung/
+endif
+
+# CCIC
+obj-y += ccic/
+
+# FIVE TEE driver
+obj-$(CONFIG_FIVE_TEE_DRIVER)	+= security/samsung/five_tee_driver/
+obj-$(CONFIG_ICD)		+= security/samsung/icdrv/

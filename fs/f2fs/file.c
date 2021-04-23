@@ -1478,6 +1478,7 @@ static int f2fs_insert_range(struct inode *inode, loff_t offset, loff_t len)
 
 	if (!ret)
 		f2fs_i_size_write(inode, new_size);
+	up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
 	return ret;
 }
 
@@ -1778,6 +1779,8 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 		return ret;
 
 	f2fs_balance_fs(F2FS_I_SB(inode), true);
+
+	inode_lock(inode);
 
 	inode_lock(inode);
 

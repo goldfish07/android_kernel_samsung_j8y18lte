@@ -2016,6 +2016,90 @@ static int read_gen2_pon_off_reason(struct qpnp_pon *pon, u16 *reason,
 
 	return 0;
 }
+#ifdef CONFIG_SEC_PM_DEBUG
+static int qpnp_wake_enabled(const char *val, const struct kernel_param *kp)
+{
+	int ret = 0;
+	int old_val = wake_enabled;
+	struct qpnp_pon_config *cfg;
+
+	ret = param_set_bool(val, kp);
+	if (ret) {
+		pr_err("Unable to set qpnp_wake_enabled: %d\n", ret);
+		return ret;
+	}
+
+	if (old_val == wake_enabled)
+		return ret;
+
+	cfg = qpnp_get_cfg(sys_reset_dev, PON_KPDPWR);
+	if (!cfg) {
+		pr_err("Invalid config pointer\n");
+		return -EFAULT;
+	}
+
+	if (!wake_enabled)
+		disable_irq_wake(cfg->state_irq);
+	else
+		enable_irq_wake(cfg->state_irq);
+
+	pr_info("%s: wake_enabled changed [%d -> %d]\n",
+			__func__, old_val, wake_enabled);
+
+	return ret;
+}
+
+static struct kernel_param_ops module_ops = {
+	.set = qpnp_wake_enabled,
+	.get = param_get_bool,
+};
+
+module_param_cb(wake_enabled, &module_ops, &wake_enabled, 0644);
+
+static int qpnp_reset_enabled(const char *val, const struct kernel_param *kp)
+{
+	int ret = 0;
+	struct qpnp_pon_config *cfg;
+	u32 s2_type;
+
+	ret = param_set_bool(val, kp);
+	if (ret) {
+		pr_err("Unable to set qpnp_reset_enabled: %d\n", ret);
+		return ret;
+	}
+
+	cfg = qpnp_get_cfg(sys_reset_dev, PON_KPDPWR);
+	if (!cfg) {
+		pr_err("Invalid config pointer\n");
+		return -EFAULT;
+	}
+
+	if (!reset_enabled) {
+		qpnp_control_s2_reset(sys_reset_dev, cfg, 0);
+	}
+	else {
+		/* Configure reset type:
+		 * Debug level MID/HIGH: WARM Reset
+		 * Debug level LOW: HARD Reset
+		 */
+		s2_type = (sec_debug_is_enabled()) ?
+			PON_POWER_OFF_WARM_RESET : PON_POWER_OFF_DVDD_HARD_RESET;
+		qpnp_pon_masked_write(sys_reset_dev, cfg->s2_cntl_addr, QPNP_PON_S2_CNTL_TYPE_MASK, (u8)s2_type);
+		qpnp_control_s2_reset(sys_reset_dev, cfg, 1);
+	}
+
+	pr_info("%s: reset_enabled = %d\n", KBUILD_MODNAME, reset_enabled);
+
+	return ret;
+}
+
+static struct kernel_param_ops reset_module_ops = {
+	.set = qpnp_reset_enabled,
+	.get = param_get_bool,
+};
+
+module_param_cb(reset_enabled, &reset_module_ops, &reset_enabled, 0644);
+#endif
 
 static int pon_twm_notifier_cb(struct notifier_block *nb,
 				unsigned long action, void *data)

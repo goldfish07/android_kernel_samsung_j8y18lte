@@ -535,10 +535,12 @@ static int diag_cmd_get_ssid_range(unsigned char *src_buf, int src_len,
 		mutex_unlock(&driver->md_session_lock);
 		return -EINVAL;
 	}
+	
 	if (!mask_info->ptr) {
 		pr_err("diag: In %s, invalid input mask_info->ptr: %pK\n",
 			__func__, mask_info->ptr);
 		mutex_unlock(&driver->md_session_lock);
+		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 		return -EINVAL;
 	}
 
@@ -654,8 +656,10 @@ static int diag_cmd_get_msg_mask(unsigned char *src_buf, int src_len,
 		       __func__, src_buf, src_len, dest_buf, dest_len,
 		       mask_info);
 		mutex_unlock(&driver->md_session_lock);
+		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 		return -EINVAL;
 	}
+	
 	if (!mask_info->ptr) {
 		pr_err("diag: In %s, invalid input mask_info->ptr: %pK\n",
 			__func__, mask_info->ptr);
@@ -738,10 +742,12 @@ static int diag_cmd_set_msg_mask(unsigned char *src_buf, int src_len,
 		mutex_unlock(&driver->md_session_lock);
 		return -EINVAL;
 	}
+	
 	if (!mask_info->ptr) {
 		pr_err("diag: In %s, invalid input mask_info->ptr: %pK\n",
 			__func__, mask_info->ptr);
 		mutex_unlock(&driver->md_session_lock);
+		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 		return -EINVAL;
 	}
 
@@ -825,6 +831,7 @@ static int diag_cmd_set_msg_mask(unsigned char *src_buf, int src_len,
 	mutex_unlock(&driver->msg_mask_lock);
 	mutex_unlock(&mask_info->lock);
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(MSG_MASKS_TYPE);
 
@@ -917,6 +924,7 @@ static int diag_cmd_set_all_msg_mask(unsigned char *src_buf, int src_len,
 	mutex_unlock(&driver->msg_mask_lock);
 	mutex_unlock(&mask_info->lock);
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(MSG_MASKS_TYPE);
 
@@ -1015,11 +1023,13 @@ static int diag_cmd_update_event_mask(unsigned char *src_buf, int src_len,
 	}
 
 	mutex_lock(&mask_info->lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: acquired mask_info->lock\n", __func__, __LINE__);
 	if (src_len >= header_len + mask_len)
 		memcpy(mask_info->ptr, src_buf + header_len, mask_len);
 	mask_info->status = DIAG_CTRL_MASK_VALID;
 	mutex_unlock(&mask_info->lock);
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(EVENT_MASKS_TYPE);
 
@@ -1084,6 +1094,7 @@ static int diag_cmd_toggle_events(unsigned char *src_buf, int src_len,
 	}
 	mutex_unlock(&mask_info->lock);
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(EVENT_MASKS_TYPE);
 
@@ -1132,10 +1143,12 @@ static int diag_cmd_get_log_mask(unsigned char *src_buf, int src_len,
 		mutex_unlock(&driver->md_session_lock);
 		return -EINVAL;
 	}
+	
 	if (!mask_info->ptr) {
 		pr_err("diag: In %s, invalid input mask_info->ptr: %pK\n",
 			__func__, mask_info->ptr);
 		mutex_unlock(&driver->md_session_lock);
+		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 		return -EINVAL;
 	}
 
@@ -1355,6 +1368,7 @@ static int diag_cmd_set_log_mask(unsigned char *src_buf, int src_len,
 	}
 	mutex_unlock(&mask_info->lock);
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(LOG_MASKS_TYPE);
 
@@ -1436,6 +1450,7 @@ static int diag_cmd_disable_log_mask(unsigned char *src_buf, int src_len,
 	}
 	mask_info->status = DIAG_CTRL_MASK_ALL_DISABLED;
 	mutex_unlock(&driver->md_session_lock);
+	DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s:%d: released md_session_lock\n", __func__, __LINE__);
 	if (diag_check_update(APPS_DATA, pid))
 		diag_update_userspace_clients(LOG_MASKS_TYPE);
 

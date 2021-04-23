@@ -52,6 +52,8 @@ enum {
 	ASM_MAX_CAL_TYPES
 };
 
+#define FRAME_NUM             (8)
+
 /* TODO, combine them together */
 static DEFINE_MUTEX(session_lock);
 struct asm_mmap {
@@ -1247,6 +1249,8 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 			pr_debug("%s: buffer already allocated\n", __func__);
 			return 0;
 		}
+		if (bufcnt != FRAME_NUM)
+			goto fail;
 		mutex_lock(&ac->cmd_lock);
 		if (bufcnt > (U32_MAX/sizeof(struct audio_buffer))) {
 			pr_err("%s: Buffer size overflows", __func__);
@@ -1526,7 +1530,7 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 				wake_up(&ac->mem_wait);
 			if (data->payload_size >= 2 * sizeof(uint32_t))
 				dev_vdbg(ac->dev, "%s: Payload = [0x%x] status[0x%x]\n",
-					__func__, payload[0], payload[1]);
+ 					__func__, payload[0], payload[1]);
 			else
 				dev_vdbg(ac->dev, "%s: Payload size of %d is less than expected.\n",
 					__func__, data->payload_size);
@@ -1550,7 +1554,7 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 			spin_unlock_irqrestore(
 				&(session[sid].session_lock), flags);
 		return 0;
-	}
+	}	
 	port = &ac->port[dir];
 
 	switch (data->opcode) {
@@ -1929,17 +1933,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 				return -EINVAL;
 			}
 			spin_lock_irqsave(&port->dsp_lock, dsp_flags);
-			if (data->token < 0 ||
-					data->token >= port->max_buf_cnt) {
-				pr_debug("%s: Invalid token buffer index %u\n",
-					__func__, data->token);
-				spin_unlock_irqrestore(&port->dsp_lock,
-								dsp_flags);
-				spin_unlock_irqrestore(
-					&(session[session_id].session_lock),
-					flags);
-				return -EINVAL;
-			}
 			if (data->payload_size >= 2 * sizeof(uint32_t) &&
 				(lower_32_bits(port->buf[data->token].phys) !=
 				payload[0] ||
@@ -3843,6 +3836,13 @@ int q6asm_set_encdec_chan_map(struct audio_client *ac,
 	struct asm_dec_out_chan_map_param chan_map;
 	u8 *channel_mapping;
 	int rc = 0;
+
+	if (num_channels > MAX_CHAN_MAP_CHANNELS) {
+		pr_err("%s: Invalid channel count %d\n", __func__,
+			num_channels);
+		return -EINVAL;
+	}
+
 	pr_debug("%s: Session %d, num_channels = %d\n",
 			 __func__, ac->session, num_channels);
 
