@@ -101,7 +101,7 @@ static int sdcardfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 		/* Make reserved blocks invisiable to media storage */
 		buf->f_bfree = buf->f_bavail;
 	}
-
+out:
 	/* set return buf to our f/s to avoid confusing user-level utils */
 	buf->f_type = SDCARDFS_SUPER_MAGIC;
 
@@ -149,7 +149,7 @@ static int sdcardfs_remount_fs2(struct vfsmount *mnt, struct super_block *sb,
 		pr_err("sdcardfs: remount flags 0x%x unsupported\n", *flags);
 		err = -EINVAL;
 	}
-	pr_info("Remount options were %s for vfsmnt %pK.\n", options, mnt);
+	pr_info("Remount options were %s.\n", options);
 	err = parse_options_remount(sb, options, *flags & ~MS_SILENT, mnt->data);
 
 

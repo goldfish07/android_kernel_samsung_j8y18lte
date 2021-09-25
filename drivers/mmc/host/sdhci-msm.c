@@ -43,6 +43,8 @@
 #include "sdhci-msm-ice.h"
 #include "cmdq_hci.h"
 
+#include <linux/sec_class.h>
+
 #define QOS_REMOVE_DELAY_MS	10
 #define CORE_POWER		0x0
 #define CORE_SW_RST		(1 << 7)
@@ -3760,6 +3762,15 @@ static unsigned int sdhci_msm_get_current_limit(struct sdhci_host *host)
 	return max_curr;
 }
 
+static void sdhci_msm_card_event(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+
+	if (!mmc_gpio_get_cd(msm_host->mmc))
+		msm_host->saved_tuning_phase = INVALID_TUNING_PHASE;
+}
+
 static struct sdhci_ops sdhci_msm_ops = {
 	.crypto_engine_cfg = sdhci_msm_ice_cfg,
 	.crypto_cfg_reset = sdhci_msm_ice_cfg_reset,
@@ -3786,6 +3797,7 @@ static struct sdhci_ops sdhci_msm_ops = {
 	.pre_req = sdhci_msm_pre_req,
 	.post_req = sdhci_msm_post_req,
 	.get_current_limit = sdhci_msm_get_current_limit,
+	.card_event = sdhci_msm_card_event,
 };
 
 static void sdhci_set_default_hw_caps(struct sdhci_msm_host *msm_host,
@@ -4756,19 +4768,24 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Set host capabilities */
 	msm_host->mmc->caps |= msm_host->pdata->mmc_bus_width;
 	msm_host->mmc->caps |= msm_host->pdata->caps;
-	msm_host->mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
+//	msm_host->mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 	msm_host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
 	msm_host->mmc->caps2 |= msm_host->pdata->caps2;
 	msm_host->mmc->caps2 |= MMC_CAP2_BOOTPART_NOACC;
 	msm_host->mmc->caps2 |= MMC_CAP2_HS400_POST_TUNING;
-	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
-	msm_host->mmc->caps2 |= MMC_CAP2_SANITIZE;
+//	msm_host->mmc->caps2 |= MMC_CAP2_CLK_SCALE;
 	msm_host->mmc->caps2 |= MMC_CAP2_MAX_DISCARD_SIZE;
 	msm_host->mmc->caps2 |= MMC_CAP2_SLEEP_AWAKE;
+	msm_host->mmc->caps2 |= MMC_CAP2_DETECT_ON_ERR;
 	msm_host->mmc->pm_caps |= MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
+#if defined(CONFIG_SEC_HYBRID_TRAY)
+	msm_host->mmc->caps2 |= MMC_CAP2_NO_PRESCAN_POWERUP;
+#endif
 
-	if (msm_host->pdata->nonremovable)
+	if (msm_host->pdata->nonremovable) {
 		msm_host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+		msm_host->mmc->pm_caps |= MMC_PM_SKIP_RESUME_INIT;
+	}
 
 	if (msm_host->pdata->nonhotplug)
 		msm_host->mmc->caps2 |= MMC_CAP2_NONHOTPLUG;

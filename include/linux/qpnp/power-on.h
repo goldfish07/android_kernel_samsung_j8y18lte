@@ -47,6 +47,7 @@ enum pon_power_off_type {
 	PON_POWER_OFF_WARM_RESET	= 0x01,
 	PON_POWER_OFF_SHUTDOWN		= 0x04,
 	PON_POWER_OFF_HARD_RESET	= 0x07,
+	PON_POWER_OFF_DVDD_HARD_RESET	= 0x08,
 	PON_POWER_OFF_MAX_TYPE		= 0x10,
 };
 
@@ -103,6 +104,12 @@ enum pon_restart_reason {
 	PON_RESTART_REASON_MAX			= 0x40
 };
 
+#ifdef CONFIG_SEC_PM
+int qpnp_pon_check_chg_det(void);
+int qpnp_control_s2_reset_onoff(int on);
+int qpnp_get_s2_reset_onoff(void);
+#endif
+
 #ifdef CONFIG_QPNP_POWER_ON
 int qpnp_pon_system_pwr_off(enum pon_power_off_type type);
 int qpnp_pon_is_warm_reset(void);
@@ -134,6 +141,13 @@ static inline bool qpnp_pon_check_hard_reset_stored(void)
 {
 	return false;
 }
+#endif
+
+#if defined(CONFIG_SEC_PM)
+int get_pkey_press(void);
+int get_vdkey_press(void);
+int vdkey_pressed_count(int clear);
+int pkey_pressed_count(int clear);
 #endif
 
 #endif

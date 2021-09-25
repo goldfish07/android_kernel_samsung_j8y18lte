@@ -1373,6 +1373,8 @@ page_hit:
 			next_blkaddr_of_node(page));
 		err = -EINVAL;
 out_err:
+		if (PageUptodate(page))
+			print_block_data(sbi->sb, nid, page_address(page), 0, F2FS_BLKSIZE);
 		ClearPageUptodate(page);
 		f2fs_put_page(page, 1);
 		return ERR_PTR(err);
@@ -1849,7 +1851,7 @@ continue_unlock:
 		step++;
 		goto next_step;
 	}
-out:
+
 	if (nwritten)
 		f2fs_submit_merged_write(sbi, NODE);
 
@@ -1867,6 +1869,7 @@ int f2fs_wait_on_node_pages_writeback(struct f2fs_sb_info *sbi,
 	unsigned long flags;
 	unsigned int cur_seq_id = 0;
 	int ret2 = 0, ret = 0;
+	int nr_pages;
 
 	while (seq_id && cur_seq_id < seq_id) {
 		spin_lock_irqsave(&sbi->fsync_node_lock, flags);
@@ -2166,10 +2169,11 @@ static int scan_nat_page(struct f2fs_sb_info *sbi,
 			break;
 
 		blk_addr = le32_to_cpu(nat_blk->entries[i].block_addr);
-
-		if (blk_addr == NEW_ADDR)
-			return -EINVAL;
-
+		if (unlikely(blk_addr == NEW_ADDR)) {
+			print_block_data(sbi->sb, current_nat_addr(sbi, start_nid),
+				page_address(nat_page), 0, F2FS_BLKSIZE);
+			f2fs_bug_on(sbi, 1);
+		}
 		if (blk_addr == NULL_ADDR) {
 			add_free_nid(sbi, start_nid, true, true);
 		} else {
@@ -2613,7 +2617,6 @@ int f2fs_restore_node_summary(struct f2fs_sb_info *sbi,
 		invalidate_mapping_pages(META_MAPPING(sbi), addr,
 							addr + nrpages);
 	}
-	return 0;
 }
 
 static void remove_nats_in_journal(struct f2fs_sb_info *sbi)

@@ -60,7 +60,8 @@ obj-$(CONFIG_FB_I810)           += video/fbdev/i810/
 obj-$(CONFIG_FB_INTEL)          += video/fbdev/intelfb/
 
 obj-$(CONFIG_PARPORT)		+= parport/
-obj-y				+= base/ block/ misc/ mfd/ nfc/ soc/
+obj-y				+= base/ block/ misc/ mfd/ soc/
+obj-$(CONFIG_VBUS_NOTIFIER)	+= staging/samsung/sec_notifier/
 obj-$(CONFIG_DMA_SHARED_BUFFER) += dma-buf/
 obj-$(CONFIG_NUBUS)		+= nubus/
 obj-y				+= macintosh/
@@ -142,6 +143,7 @@ obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
 #common clk code
 obj-y				+= clk/
+obj-$(CONFIG_SAMSUNG_NFC)		+= nfc/
 
 obj-$(CONFIG_MAILBOX)		+= mailbox/
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
@@ -154,6 +156,15 @@ obj-$(CONFIG_VIRT_DRIVERS)	+= virt/
 obj-$(CONFIG_HYPERV)		+= hv/
 
 obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
+ifeq ($(CONFIG_BATTERY_SAMSUNG_V2), y)
+	obj-$(CONFIG_BATTERY_SAMSUNG)	+= battery_v2/
+else 
+ifeq ($(CONFIG_BATTERY_SAMSUNG_V2_LEGACY), y)
+	obj-$(CONFIG_BATTERY_SAMSUNG)	+= battery_v2_legacy/
+else
+	obj-$(CONFIG_BATTERY_SAMSUNG)	+= battery/
+endif
+endif
 obj-$(CONFIG_EXTCON)		+= extcon/
 obj-$(CONFIG_MEMORY)		+= memory/
 obj-$(CONFIG_IIO)		+= iio/

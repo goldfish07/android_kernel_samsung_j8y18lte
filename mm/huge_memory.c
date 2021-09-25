@@ -1243,6 +1243,13 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
 		_pmd = pmd_mkyoung(*pmd);
 		if (flags & FOLL_WRITE)
 			_pmd = pmd_mkdirty(_pmd);
+		 * And if the dirty bit will become meaningful and
+		 * we'll only set it with FOLL_WRITE, an atomic
+		 * set_bit will be required on the pmd to set the
+		 * young bit, instead of the current set_pmd_at.
+		 */
+		_pmd = pmd_mkyoung(pmd_mkdirty(*pmd));
+
 		if (pmdp_set_access_flags(vma, addr & HPAGE_PMD_MASK,
 					  pmd, _pmd, flags & FOLL_WRITE))
 			update_mmu_cache_pmd(vma, addr, pmd);
@@ -1462,7 +1469,7 @@ int move_huge_pmd(struct vm_area_struct *vma, struct vm_area_struct *new_vma,
 	spinlock_t *old_ptl, *new_ptl;
 	int ret = 0;
 	pmd_t pmd;
-	bool force_flush = false;
+
 	struct mm_struct *mm = vma->vm_mm;
 
 	if ((old_addr & ~HPAGE_PMD_MASK) ||
@@ -1490,8 +1497,6 @@ int move_huge_pmd(struct vm_area_struct *vma, struct vm_area_struct *new_vma,
 		if (new_ptl != old_ptl)
 			spin_lock_nested(new_ptl, SINGLE_DEPTH_NESTING);
 		pmd = pmdp_get_and_clear(mm, old_addr, old_pmd);
-		if (pmd_present(pmd))
-			force_flush = true;
 		VM_BUG_ON(!pmd_none(*new_pmd));
 
 		if (pmd_move_must_withdraw(new_ptl, old_ptl)) {
@@ -1500,8 +1505,6 @@ int move_huge_pmd(struct vm_area_struct *vma, struct vm_area_struct *new_vma,
 			pgtable_trans_huge_deposit(mm, new_pmd, pgtable);
 		}
 		set_pmd_at(mm, new_addr, new_pmd, pmd_mksoft_dirty(pmd));
-		if (force_flush)
-			flush_tlb_range(vma, old_addr, old_addr + PMD_SIZE);
 		if (new_ptl != old_ptl)
 			spin_unlock(new_ptl);
 		spin_unlock(old_ptl);

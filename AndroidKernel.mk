@@ -144,6 +144,27 @@ $(KERNEL_USR): $(KERNEL_HEADERS_INSTALL)
 $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_USR)
 endif
 
+#Tweak defconfig for FACTORY KERNEL without additional fac_defcofig
+define modi-facdefconfig64
+chmod 664 $(TARGET_KERNEL_SOURCE)/arch/arm64/configs/$(VARIANT_DEFCONFIG)
+echo -e "\nCONFIG_SEC_FACTORY=y" >> $(TARGET_KERNEL_SOURCE)/arch/arm64/configs/$(VARIANT_DEFCONFIG)
+endef
+
+define modi-facdefconfig
+chmod 664 $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(VARIANT_DEFCONFIG)
+echo -e "\nCONFIG_SEC_FACTORY=y" >> $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(VARIANT_DEFCONFIG)
+endef
+
+define modi-shipdefconfig64
+chmod 664 $(TARGET_KERNEL_SOURCE)/arch/arm64/configs/$(VARIANT_DEFCONFIG)
+echo -e "\nCONFIG_SAMSUNG_PRODUCT_SHIP=y" >> $(TARGET_KERNEL_SOURCE)/arch/arm64/configs/$(VARIANT_DEFCONFIG)
+endef
+
+define modi-shipdefconfig
+chmod 664 $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(VARIANT_DEFCONFIG)
+echo -e "\nCONFIG_SAMSUNG_PRODUCT_SHIP=y" >> $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(VARIANT_DEFCONFIG)
+endef
+
 $(KERNEL_OUT):
 	mkdir -p $(KERNEL_OUT)
 
@@ -164,6 +185,20 @@ $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_HEADERS_INSTALL)
 	$(clean-module-folder)
 
 $(KERNEL_HEADERS_INSTALL): $(KERNEL_OUT)
+ifeq ($(SEC_FACTORY_BUILD), true)
+ifeq ($(KERNEL_ARCH),arm64)
+	$(modi-facdefconfig64)
+else
+	$(modi-facdefconfig)
+endif
+endif
+ifeq ($(SEC_PRODUCT_SHIP), true)
+ifeq ($(KERNEL_ARCH),arm64)
+	$(modi-shipdefconfig64)
+else
+	$(modi-shipdefconfig)
+endif
+endif
 	$(hide) if [ ! -z "$(KERNEL_HEADER_DEFCONFIG)" ]; then \
 			rm -f $(BUILD_ROOT_LOC)$(KERNEL_CONFIG); \
 			$(MAKE) -C $(TARGET_KERNEL_SOURCE) O=$(BUILD_ROOT_LOC)$(KERNEL_OUT) $(KERNEL_MAKE_ENV) ARCH=$(KERNEL_HEADER_ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE) $(KERNEL_HEADER_DEFCONFIG); \
